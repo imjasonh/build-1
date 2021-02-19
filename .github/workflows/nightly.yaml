@@ -16,6 +16,7 @@ jobs:
       id: date
       run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
 
+    # TODO: Don't publish a new release if there are no changes since the last release.
     - name: Draft release
       id: draft_release
       uses: actions/create-release@v1
