@@ -12,13 +12,6 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Tag HEAD with nightly
-      id: tag_version
-      uses: mathieudutour/github-tag-action@v5.1
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        custom_tag: nightly
-
     - name: Get current date
       id: date
       run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
