@@ -67,7 +67,7 @@ jobs:
         asset_name: nightly-${{ steps.date.outputs.date}}.yaml
         asset_content_type: application/x-yaml
     - name: Upload Release Asset
-      id: upload_release_asset 
+      id: upload_release_asset-debug
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
