@@ -6,8 +6,8 @@
 
 set -euo pipefail
 
-echo "Logging into container registry $IMAGE_HOST"
-echo "$REGISTRY_PASSWORD" | ko login -u "$REGISTRY_USERNAME" --password-stdin "$IMAGE_HOST"
+#echo "Logging into container registry $IMAGE_HOST"
+#echo "$REGISTRY_PASSWORD" | ko login -u "$REGISTRY_USERNAME" --password-stdin "$IMAGE_HOST"
 
 echo "Building container image"
 
