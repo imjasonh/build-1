@@ -21,8 +21,8 @@ jobs:
       uses: actions/create-release@v1
       continue-on-error: true
       with:
-        release_name: "Shipwright Build Nightly Release"
-        body: "Nightly release"
+        release_name: "Shipwright Build Nightly Release ${{ steps.date.outputs.date }}"
+        body: "Nightly release ${{ steps.date.outputs.date }}"
         tag_name: nightly
         draft: true
         prerelease: true
