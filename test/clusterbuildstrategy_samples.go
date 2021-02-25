@@ -123,7 +123,7 @@ metadata:
 spec:
   buildSteps:
     - name: step-build-and-push
-      image: gcr.io/kaniko-project/executor:v1.3.0
+      image: gcr.io/kaniko-project/executor:v1.5.1
       workingDir: /workspace/source
       securityContext:
         runAsUser: 0
@@ -151,6 +151,7 @@ spec:
         - --destination=$(build.output.image)
         - --oci-layout-path=/workspace/output/image
         - --snapshotMode=redo
+        - --push-retry=3
       resources:
         limits:
           cpu: 500m
@@ -171,7 +172,7 @@ metadata:
 spec:
   buildSteps:
     - name: step-build-and-push
-      image: gcr.io/kaniko-project/executor:v1.3.0
+      image: gcr.io/kaniko-project/executor:v1.5.1
       workingDir: /workspace/source
       securityContext:
         runAsUser: 0
@@ -199,6 +200,7 @@ spec:
         - --destination=$(build.output.image)
         - --oci-layout-path=/workspace/output/image
         - --snapshotMode=redo
+        - --push-retry=3
       resources:
         limits:
           cpu: 500m
@@ -247,6 +249,29 @@ spec:
         memory: 128Mi
 `
 
+// ClusterBuildStrategySleep30s is a strategy that does only sleep 30 seconds
+const ClusterBuildStrategySleep30s = `
+apiVersion: build.dev/v1alpha1
+kind: ClusterBuildStrategy
+metadata:
+  name: noop
+spec:
+  buildSteps:
+  - name: sleep30
+    image: alpine:latest
+    command:
+    - sleep
+    args:
+    - "30s"
+    resources:
+      limits:
+        cpu: 250m
+        memory: 128Mi
+      requests:
+        cpu: 250m
+        memory: 128Mi
+`
+
 // ClusterBuildStrategyWithAnnotations is a cluster build strategy that contains annotations
 const ClusterBuildStrategyWithAnnotations = `
 apiVersion: build.dev/v1alpha1
@@ -260,7 +285,7 @@ metadata:
 spec:
   buildSteps:
     - name: step-build-and-push
-      image: gcr.io/kaniko-project/executor:v1.3.0
+      image: gcr.io/kaniko-project/executor:v1.5.1
       workingDir: /workspace/source
       securityContext:
         runAsUser: 0
@@ -288,6 +313,7 @@ spec:
         - --destination=$(build.output.image)
         - --oci-layout-path=/workspace/output/image
         - --snapshotMode=redo
+        - --push-retry=3
       resources:
         limits:
           cpu: 500m

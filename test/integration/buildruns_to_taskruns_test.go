@@ -28,6 +28,40 @@ var _ = Describe("Integration tests BuildRuns and TaskRuns", func() {
 		buildRunSample []byte
 	)
 
+	var setupBuildAndBuildRun = func(buildDef []byte, buildRunDef []byte, strategy ...string) (watch.Interface, *v1alpha1.Build, *v1alpha1.BuildRun) {
+
+		var strategyName = STRATEGY + tb.Namespace
+		if len(strategy) > 0 {
+			strategyName = strategy[0]
+		}
+
+		buildRunWitcher, err := tb.BuildClientSet.BuildV1alpha1().BuildRuns(tb.Namespace).Watch(context.TODO(), metav1.ListOptions{})
+		Expect(err).To(BeNil())
+
+		buildObject, err = tb.Catalog.LoadBuildWithNameAndStrategy(BUILD+tb.Namespace, strategyName, buildDef)
+		Expect(err).To(BeNil())
+		Expect(tb.CreateBuild(buildObject)).To(BeNil())
+
+		buildObject, err = tb.GetBuildTillValidation(buildObject.Name)
+		Expect(err).To(BeNil())
+
+		buildRunObject, err = tb.Catalog.LoadBRWithNameAndRef(BUILDRUN+tb.Namespace, BUILD+tb.Namespace, buildRunDef)
+		Expect(err).To(BeNil())
+		Expect(tb.CreateBR(buildRunObject)).To(BeNil())
+
+		//TODO: consider how to deal with buildObject or buildRunObject
+		return buildRunWitcher, buildObject, buildRunObject
+	}
+
+	var WithCustomClusterBuildStrategy = func(data []byte, f func()) {
+		customClusterBuildStrategy, err := tb.Catalog.LoadCBSWithName(STRATEGY+tb.Namespace+"custom", data)
+		Expect(err).To(BeNil())
+
+		Expect(tb.CreateClusterBuildStrategy(customClusterBuildStrategy)).To(BeNil())
+		f()
+		Expect(tb.DeleteClusterBuildStrategy(customClusterBuildStrategy.Name)).To(BeNil())
+	}
+
 	// Load the ClusterBuildStrategies before each test case
 	BeforeEach(func() {
 		cbsObject, err = tb.Catalog.LoadCBSWithName(STRATEGY+tb.Namespace, []byte(test.ClusterBuildStrategySingleStepKaniko))
@@ -64,37 +98,6 @@ var _ = Describe("Integration tests BuildRuns and TaskRuns", func() {
 	})
 
 	Context("when buildrun uses conditions", func() {
-		var setupBuildAndBuildRun = func(buildDef []byte, buildRunDef []byte, strategy ...string) (watch.Interface, *v1alpha1.Build, *v1alpha1.BuildRun) {
-
-			var strategyName = STRATEGY + tb.Namespace
-			if len(strategy) > 0 {
-				strategyName = strategy[0]
-			}
-
-			buildRunWitcher, err := tb.BuildClientSet.BuildV1alpha1().BuildRuns(tb.Namespace).Watch(context.TODO(), metav1.ListOptions{})
-			Expect(err).To(BeNil())
-
-			buildObject, err = tb.Catalog.LoadBuildWithNameAndStrategy(BUILD+tb.Namespace, strategyName, buildDef)
-			Expect(err).To(BeNil())
-			Expect(tb.CreateBuild(buildObject)).To(BeNil())
-
-			buildRunObject, err = tb.Catalog.LoadBRWithNameAndRef(BUILDRUN+tb.Namespace, BUILD+tb.Namespace, buildRunDef)
-			Expect(err).To(BeNil())
-			Expect(tb.CreateBR(buildRunObject)).To(BeNil())
-
-			//TODO: consider how to deal with buildObject or buildRunObject
-			return buildRunWitcher, buildObject, buildRunObject
-		}
-
-		var WithCustomClusterBuildStrategy = func(data []byte, f func()) {
-			customClusterBuildStrategy, err := tb.Catalog.LoadCBSWithName(STRATEGY+tb.Namespace+"custom", data)
-			Expect(err).To(BeNil())
-
-			Expect(tb.CreateClusterBuildStrategy(customClusterBuildStrategy)).To(BeNil())
-			f()
-			Expect(tb.DeleteClusterBuildStrategy(customClusterBuildStrategy.Name)).To(BeNil())
-		}
-
 		Context("when condition status unknown", func() {
 			It("reflects a change from pending to running reason", func() {
 				buildRunWitcher, _, _ := setupBuildAndBuildRun([]byte(test.BuildCBSMinimal), []byte(test.MinimalBuildRun))
@@ -251,36 +254,35 @@ var _ = Describe("Integration tests BuildRuns and TaskRuns", func() {
 	})
 
 	Context("when a buildrun is created", func() {
-
-		BeforeEach(func() {
-			buildSample = []byte(test.BuildCBSMinimal)
-			buildRunSample = []byte(test.MinimalBuildRun)
-		})
-
 		It("should reflect a Pending and Running reason", func() {
+			// use a custom strategy here that just sleeps 30 seconds to prevent it from completing too fast so that we do not get the Running state
+			WithCustomClusterBuildStrategy([]byte(test.ClusterBuildStrategySleep30s), func() {
+				_, _, buildRunObject := setupBuildAndBuildRun([]byte(test.BuildCBSMinimal), []byte(test.MinimalBuildRun), STRATEGY+tb.Namespace+"custom")
 
-			Expect(tb.CreateBuild(buildObject)).To(BeNil())
+				_, err = tb.GetBRTillStartTime(buildRunObject.Name)
+				Expect(err).To(BeNil())
 
-			Expect(tb.CreateBR(buildRunObject)).To(BeNil())
+				// Pending is an intermediate state where a certain amount of luck is needed to capture it with a polling interval of 3s.
+				// Also, if the build-operator is not reconciling on this TaskRun status quick enough, a BuildRun might never be in Pending
+				// but rather directly go to Running.
+				/*
+					expectedReason := "Pending"
+					actualReason, err := tb.GetTRTillDesiredReason(buildRunObject.Name, expectedReason)
+					Expect(err).To(BeNil(), fmt.Sprintf("failed to get desired reason; expected %s, got %s", expectedReason, actualReason))
 
-			_, err = tb.GetBRTillStartTime(buildRunObject.Name)
-			Expect(err).To(BeNil())
+					expectedReason = "Pending"
+					actualReason, err = tb.GetBRTillDesiredReason(buildRunObject.Name, expectedReason)
+					Expect(err).To(BeNil(), fmt.Sprintf("failed to get desired reason; expected %s, got %s", expectedReason, actualReason))
+				*/
 
-			expectedReason := "Pending"
-			actualReason, err := tb.GetTRTillDesiredReason(buildRunObject.Name, expectedReason)
-			Expect(err).To(BeNil(), fmt.Sprintf("failed to get desired reason; expected %s, got %s", expectedReason, actualReason))
+				expectedReason := "Running"
+				actualReason, err := tb.GetTRTillDesiredReason(buildRunObject.Name, expectedReason)
+				Expect(err).To(BeNil(), fmt.Sprintf("failed to get desired reason; expected %s, got %s", expectedReason, actualReason))
 
-			expectedReason = "Pending"
-			actualReason, err = tb.GetBRTillDesiredReason(buildRunObject.Name, expectedReason)
-			Expect(err).To(BeNil(), fmt.Sprintf("failed to get desired reason; expected %s, got %s", expectedReason, actualReason))
-
-			expectedReason = "Running"
-			actualReason, err = tb.GetTRTillDesiredReason(buildRunObject.Name, expectedReason)
-			Expect(err).To(BeNil(), fmt.Sprintf("failed to get desired reason; expected %s, got %s", expectedReason, actualReason))
-
-			expectedReason = "Running"
-			actualReason, err = tb.GetBRTillDesiredReason(buildRunObject.Name, expectedReason)
-			Expect(err).To(BeNil(), fmt.Sprintf("failed to get desired reason; expected %s, got %s", expectedReason, actualReason))
+				expectedReason = "Running"
+				actualReason, err = tb.GetBRTillDesiredReason(buildRunObject.Name, expectedReason)
+				Expect(err).To(BeNil(), fmt.Sprintf("failed to get desired reason; expected %s, got %s", expectedReason, actualReason))
+			})
 		})
 	})
 
@@ -294,6 +296,9 @@ var _ = Describe("Integration tests BuildRuns and TaskRuns", func() {
 		It("should reflect a TaskRunTimeout reason and Completion time on timeout", func() {
 
 			Expect(tb.CreateBuild(buildObject)).To(BeNil())
+
+			buildObject, err = tb.GetBuildTillValidation(buildObject.Name)
+			Expect(err).To(BeNil())
 
 			Expect(tb.CreateBR(buildRunObject)).To(BeNil())
 
@@ -328,6 +333,9 @@ var _ = Describe("Integration tests BuildRuns and TaskRuns", func() {
 
 			Expect(tb.CreateBuild(buildObject)).To(BeNil())
 
+			buildObject, err = tb.GetBuildTillValidation(buildObject.Name)
+			Expect(err).To(BeNil())
+
 			Expect(tb.CreateBR(buildRunObject)).To(BeNil())
 
 			b, err := tb.GetBuildTillRegistration(buildObject.Name, corev1.ConditionFalse)
@@ -360,6 +368,9 @@ var _ = Describe("Integration tests BuildRuns and TaskRuns", func() {
 
 			Expect(tb.CreateBuild(buildObject)).To(BeNil())
 
+			buildObject, err = tb.GetBuildTillValidation(buildObject.Name)
+			Expect(err).To(BeNil())
+
 			Expect(tb.CreateBR(buildRunObject)).To(BeNil())
 
 			_, err = tb.GetBRTillStartTime(buildRunObject.Name)
@@ -380,6 +391,68 @@ var _ = Describe("Integration tests BuildRuns and TaskRuns", func() {
 			expectedReason = "TaskRunCancelled"
 			actualReason, err = tb.GetTRTillDesiredReason(buildRunObject.Name, expectedReason)
 			Expect(err).To(BeNil(), fmt.Sprintf("failed to get desired reason; expected %s, got %s", expectedReason, actualReason))
+		})
+	})
+
+	Context("when a buildrun is created and the taskrun deleted before completion", func() {
+
+		BeforeEach(func() {
+			buildSample = []byte(test.BuildCBSMinimal)
+			buildRunSample = []byte(test.MinimalBuildRun)
+		})
+
+		It("should reflect a Failed reason", func() {
+
+			Expect(tb.CreateBuild(buildObject)).To(BeNil())
+
+			buildObject, err = tb.GetBuildTillValidation(buildObject.Name)
+			Expect(err).To(BeNil())
+
+			Expect(tb.CreateBR(buildRunObject)).To(BeNil())
+
+			_, err = tb.GetBRTillStartTime(buildRunObject.Name)
+			Expect(err).To(BeNil())
+
+			tr, err := tb.GetTaskRunFromBuildRun(buildRunObject.Name)
+			Expect(err).To(BeNil())
+
+			tb.DeleteTR(tr.Name)
+
+			expectedReason := fmt.Sprintf("taskRun %s doesn't exist", tr.Name)
+			actualReason, err := tb.GetBRTillDesiredReason(buildRunObject.Name, expectedReason)
+			Expect(err).To(BeNil(), fmt.Sprintf("failed to get desired reason; expected %s, got %s", expectedReason, actualReason))
+		})
+	})
+
+	Context("when a buildrun is created and the taskrun deleted after successful completion", func() {
+
+		It("should reflect a Success reason", func() {
+			WithCustomClusterBuildStrategy([]byte(test.ClusterBuildStrategyNoOp), func() {
+				_, _, buildRunObject := setupBuildAndBuildRun([]byte(test.BuildCBSMinimal), []byte(test.MinimalBuildRun), STRATEGY+tb.Namespace+"custom")
+
+				_, err = tb.GetBRTillCompletion(buildRunObject.Name)
+				Expect(err).To(BeNil())
+
+				reason, err := tb.GetBRReason(buildRunObject.Name)
+				Expect(err).To(BeNil())
+				Expect(reason).To(Equal("Succeeded"))
+
+				tr, err := tb.GetTaskRunFromBuildRun(buildRunObject.Name)
+				Expect(err).To(BeNil())
+				Expect(tr.Status.CompletionTime).NotTo(BeNil())
+
+				tb.DeleteTR(tr.Name)
+
+				// in a test case, it is hard to verify that something (marking the BuildRun failed) is not happening, we quickly check the TaskRun is gone and
+				// check one more time that the BuildRun is still Succeeded
+				_, err = tb.GetTaskRunFromBuildRun(buildRunObject.Name)
+				Expect(err).NotTo(BeNil())
+				Expect(err.Error()).To(ContainSubstring("failed to find an owned TaskRun"))
+
+				reason, err = tb.GetBRReason(buildRunObject.Name)
+				Expect(err).To(BeNil())
+				Expect(reason).To(Equal("Succeeded"))
+			})
 		})
 	})
 })
