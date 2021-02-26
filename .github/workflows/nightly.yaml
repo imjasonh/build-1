@@ -62,7 +62,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ steps.get_release.outputs.upload_url }}?name=nightly-${{ steps.date.outputs.date }}-debug.yaml&label=debug
+        upload_url: ${{ steps.get_release.outputs.upload_url }}?name=nightly-${{ steps.date.outputs.date }}-debug.yaml
         asset_path: ./nightly-${{ steps.date.outputs.date }}-debug.yaml
         asset_name: nightly-${{ steps.date.outputs.date}}-debug.yaml
         asset_content_type: application/x-yaml
