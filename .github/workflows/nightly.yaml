@@ -20,8 +20,8 @@ jobs:
       id: get_release
       run: |
         UPLOAD_URL=$(curl https://api.github.com/repos/${GITHUB_REPOSITORY}/releases | jq '.[] | select(.body | startswith("Nightly")).upload_url' | head -n 1)
-        echo "Latest nightly release upload URL is ${RELEASE_URL}"
-        echo "::set-output name=upload_url::${RELEASE_URL}"
+        echo "Latest nightly release upload URL is ${UPLOAD_URL}"
+        echo "::set-output name=upload_url::${UPLOAD_URL}"
 
     - name: Install Go
       uses: actions/setup-go@v2
