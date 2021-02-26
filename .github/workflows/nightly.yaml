@@ -14,12 +14,12 @@ jobs:
 
     - name: Get current date
       id: date
-      run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d-%s')"
 
     - name: Get latest nightly release upload_url
       id: get_release
       run: |
-        UPLOAD_URL=$(curl https://api.github.com/repos/${GITHUB_REPOSITORY}/releases | jq -r '.[] | select(.body | startswith("Nightly")).upload_url' | head -n 1 | cut -d"{" -f1)
+        UPLOAD_URL=$(curl https://api.github.com/repos/${GITHUB_REPOSITORY}/releases | jq -r '.[] | select(.name | startswith("Nightly Releases")).upload_url' | tail -n 1 | cut -d"{" -f1)
         echo "Latest nightly release upload URL is ${UPLOAD_URL}"
         echo "::set-output name=upload_url::${UPLOAD_URL}"
 
@@ -40,7 +40,9 @@ jobs:
         IMAGE_HOST: quay.io
         IMAGE: shipwright/shipwright-operator
       run: |
-        make release
+        echo foo > release.yaml
+        echo foo-debug > release-debug.yaml
+        #make release
         mv release.yaml nightly-${{ steps.date.outputs.date }}.yaml
         mv release-debug.yaml nightly-${{ steps.date.outputs.date }}-debug.yaml
 
