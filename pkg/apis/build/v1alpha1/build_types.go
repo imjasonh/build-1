@@ -83,11 +83,6 @@ type BuildSpec struct {
 	// +optional
 	Dockerfile *string `json:"dockerfile,omitempty"`
 
-	// Parameters contains name-value that could be used to loosely
-	// type parameters in the BuildStrategy.
-	// +optional
-	Parameters *[]Parameter `json:"parameters,omitempty"`
-
 	// Runtime represents the runtime-image
 	// +optional
 	Runtime *Runtime `json:"runtime,omitempty"`
@@ -100,6 +95,13 @@ type BuildSpec struct {
 	// +optional
 	// +kubebuilder:validation:Format=duration
 	Timeout *metav1.Duration `json:"timeout,omitempty"`
+
+	// Parameter values to pass to the BuildStrategy by default.
+	//
+	// A BuildRun can override these values.
+	//
+	// +optional
+	Params []ParamValue `json:"params,omitempty"`
 }
 
 // Image refers to an container image with credentials

@@ -22,7 +22,6 @@ const (
 
 // BuildRunSpec defines the desired state of BuildRun
 type BuildRunSpec struct {
-
 	// BuildRef refers to the Build
 	BuildRef *BuildRef `json:"buildRef"`
 
@@ -41,11 +40,18 @@ type BuildRunSpec struct {
 	// image would be pushed to. It will overwrite the output image in build spec
 	// +optional
 	Output *Image `json:"output,omitempty"`
+
+	// Parameter values to pass to the BuildStrategy.
+	//
+	// These parameters override those of the Build, if there is any
+	// conflict.
+	//
+	// +optional
+	Params []ParamValue `json:"params,omitempty"`
 }
 
 // BuildRunStatus defines the observed state of BuildRun
 type BuildRunStatus struct {
-
 	// Conditions
 	Conditions Conditions `json:"conditions,omitempty"`
 

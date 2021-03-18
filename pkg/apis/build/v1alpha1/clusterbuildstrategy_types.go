@@ -71,9 +71,10 @@ func (s ClusterBuildStrategy) GetResourceLabels() map[string]string {
 }
 
 // GetBuildSteps returns the spec build steps of the build strategy
-func (s ClusterBuildStrategy) GetBuildSteps() []BuildStep {
-	return s.Spec.BuildSteps
-}
+func (s ClusterBuildStrategy) GetBuildSteps() []BuildStep { return s.Spec.BuildSteps }
+
+// GetParams returns the spec params of the build strategy
+func (s ClusterBuildStrategy) GetParams() []Param { return s.Spec.Params }
 
 func init() {
 	SchemeBuilder.Register(&ClusterBuildStrategy{}, &ClusterBuildStrategyList{})

@@ -69,10 +69,11 @@ func (s BuildStrategy) GetResourceLabels() map[string]string {
 	}
 }
 
-// GetBuildSteps returns the spec build steps of the build strategy
-func (s BuildStrategy) GetBuildSteps() []BuildStep {
-	return s.Spec.BuildSteps
-}
+// GetBuildSteps returns the spec build steps of the build strategy.
+func (s BuildStrategy) GetBuildSteps() []BuildStep { return s.Spec.BuildSteps }
+
+// GetParams returns the params of the build strategy.
+func (s BuildStrategy) GetParams() []Param { return s.Spec.Params }
 
 func init() {
 	SchemeBuilder.Register(&BuildStrategy{}, &BuildStrategyList{})

@@ -19,6 +19,20 @@ const (
 // BuildStrategySpec defines the desired state of BuildStrategy
 type BuildStrategySpec struct {
 	BuildSteps []BuildStep `json:"buildSteps,omitempty"`
+
+	Params []Param `json:"params,omitempty"`
+}
+
+// Param describes a single parameter for a BuildStrategy.
+type Param struct {
+	// Name is the name of the parameter.
+	Name string `json:"name,omitempty"`
+
+	// Default is the default value of the parameter, if any.
+	Default *string `json:"default,omitempty"`
+
+	// Description is a human-readable description of the parameter.
+	Description string `json:"description,omitempty"`
 }
 
 // BuildStep defines a partial step that needs to run in container for
@@ -48,11 +62,12 @@ type StrategyRef struct {
 	APIVersion string `json:"apiVersion,omitempty"`
 }
 
-// BuilderStrategy defines the common elements of build strategies
-type BuilderStrategy interface {
+// BuildStrategyInterface defines the common elements of build strategies
+type BuildStrategyInterface interface {
 	GetAnnotations() map[string]string
 	GetName() string
 	GetGeneration() int64
 	GetResourceLabels() map[string]string
 	GetBuildSteps() []BuildStep
+	GetParams() []Param
 }

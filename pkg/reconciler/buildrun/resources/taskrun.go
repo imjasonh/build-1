@@ -6,6 +6,7 @@ package resources
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -53,49 +54,41 @@ func GenerateTaskSpec(
 	cfg *config.Config,
 	build *buildv1alpha1.Build,
 	buildRun *buildv1alpha1.BuildRun,
-	buildSteps []buildv1alpha1.BuildStep,
+	buildStrategy buildv1alpha1.BuildStrategyInterface,
 ) (*v1beta1.TaskSpec, error) {
 
 	generatedTaskSpec := v1beta1.TaskSpec{
 		Resources: &v1beta1.TaskResources{
-			Inputs: []v1beta1.TaskResource{
-				{
-					ResourceDeclaration: taskv1.ResourceDeclaration{
-						Name: inputSourceResourceName,
-						Type: taskv1.PipelineResourceTypeGit,
-					},
+			Inputs: []v1beta1.TaskResource{{
+				ResourceDeclaration: taskv1.ResourceDeclaration{
+					Name: inputSourceResourceName,
+					Type: taskv1.PipelineResourceTypeGit,
 				},
-			},
-			Outputs: []v1beta1.TaskResource{
-				{
-					ResourceDeclaration: taskv1.ResourceDeclaration{
-						Name: outputImageResourceName, // mapped from {{ .Build.OutputImage }}
-						Type: taskv1.PipelineResourceTypeImage,
-					},
+			}},
+			Outputs: []v1beta1.TaskResource{{
+				ResourceDeclaration: taskv1.ResourceDeclaration{
+					Name: outputImageResourceName, // mapped from {{ .Build.OutputImage }}
+					Type: taskv1.PipelineResourceTypeImage,
 				},
-			},
+			}},
 		},
-		Params: []v1beta1.ParamSpec{
-			{
-				Description: "Path to the Dockerfile",
-				Name:        inputParamDockerfile,
-				Default: &v1beta1.ArrayOrString{
-					Type:      v1beta1.ParamTypeString,
-					StringVal: "Dockerfile",
-				},
+		Params: []v1beta1.ParamSpec{{
+			Description: "Path to the Dockerfile",
+			Name:        inputParamDockerfile,
+			Default: &v1beta1.ArrayOrString{
+				Type:      v1beta1.ParamTypeString,
+				StringVal: "Dockerfile",
 			},
-			{
-				// CONTEXT_DIR comes from the git source specification
-				// in the Build object
-				Description: "The root of the code",
-				Name:        inputParamContextDir,
-				Default: &v1beta1.ArrayOrString{
-					Type:      v1beta1.ParamTypeString,
-					StringVal: ".",
-				},
+		}, {
+			// CONTEXT_DIR comes from the git source specification
+			// in the Build object
+			Description: "The root of the code",
+			Name:        inputParamContextDir,
+			Default: &v1beta1.ArrayOrString{
+				Type:      v1beta1.ParamTypeString,
+				StringVal: ".",
 			},
-		},
-		Steps: []v1beta1.Step{},
+		}},
 	}
 
 	if build.Spec.BuilderImage != nil {
@@ -109,11 +102,22 @@ func GenerateTaskSpec(
 		}
 		generatedTaskSpec.Params = append(generatedTaskSpec.Params, InputBuilderImage)
 	}
+	for _, param := range buildStrategy.GetParams() {
+		p := v1beta1.ParamSpec{
+			Name:        param.Name,
+			Description: param.Description,
+		}
+		if param.Default != nil {
+			p.Default = &v1beta1.ArrayOrString{
+				Type:      v1beta1.ParamTypeString,
+				StringVal: *param.Default,
+			}
+		}
+		generatedTaskSpec.Params = append(generatedTaskSpec.Params, p)
+	}
 
 	var vols []corev1.Volume
-
-	for _, containerValue := range buildSteps {
-
+	for _, containerValue := range buildStrategy.GetBuildSteps() {
 		var taskCommand []string
 		for _, buildStrategyCommandPart := range containerValue.Command {
 			taskCommand = append(taskCommand, getStringTransformations(buildStrategyCommandPart))
@@ -177,7 +181,7 @@ func GenerateTaskRun(
 	build *buildv1alpha1.Build,
 	buildRun *buildv1alpha1.BuildRun,
 	serviceAccountName string,
-	strategy buildv1alpha1.BuilderStrategy,
+	strategy buildv1alpha1.BuildStrategyInterface,
 ) (*v1beta1.TaskRun, error) {
 
 	// Set revision to empty if the field is not specified in the Build.
@@ -196,7 +200,7 @@ func GenerateTaskRun(
 		ImageURL = build.Spec.Output.ImageURL
 	}
 
-	taskSpec, err := GenerateTaskSpec(cfg, build, buildRun, strategy.GetBuildSteps())
+	taskSpec, err := GenerateTaskSpec(cfg, build, buildRun, strategy)
 	if err != nil {
 		return nil, err
 	}
@@ -216,42 +220,33 @@ func GenerateTaskRun(
 			ServiceAccountName: serviceAccountName,
 			TaskSpec:           taskSpec,
 			Resources: &v1beta1.TaskRunResources{
-				Inputs: []v1beta1.TaskResourceBinding{
-					{
-						PipelineResourceBinding: v1beta1.PipelineResourceBinding{
-							Name: inputSourceResourceName,
-							ResourceSpec: &taskv1.PipelineResourceSpec{
-								Type: taskv1.PipelineResourceTypeGit,
-								Params: []taskv1.ResourceParam{
-									{
-										Name:  inputGitSourceURL,
-										Value: build.Spec.Source.URL,
-									},
-									{
-										Name:  inputGitSourceRevision,
-										Value: revision,
-									},
-								},
-							},
+				Inputs: []v1beta1.TaskResourceBinding{{
+					PipelineResourceBinding: v1beta1.PipelineResourceBinding{
+						Name: inputSourceResourceName,
+						ResourceSpec: &taskv1.PipelineResourceSpec{
+							Type: taskv1.PipelineResourceTypeGit,
+							Params: []taskv1.ResourceParam{{
+								Name:  inputGitSourceURL,
+								Value: build.Spec.Source.URL,
+							}, {
+								Name:  inputGitSourceRevision,
+								Value: revision,
+							}},
 						},
 					},
-				},
-				Outputs: []v1beta1.TaskResourceBinding{
-					{
-						PipelineResourceBinding: v1beta1.PipelineResourceBinding{
-							Name: outputImageResourceName,
-							ResourceSpec: &taskv1.PipelineResourceSpec{
-								Type: taskv1.PipelineResourceTypeImage,
-								Params: []taskv1.ResourceParam{
-									{
-										Name:  outputImageResourceURL,
-										Value: ImageURL,
-									},
-								},
-							},
+				}},
+				Outputs: []v1beta1.TaskResourceBinding{{
+					PipelineResourceBinding: v1beta1.PipelineResourceBinding{
+						Name: outputImageResourceName,
+						ResourceSpec: &taskv1.PipelineResourceSpec{
+							Type: taskv1.PipelineResourceTypeImage,
+							Params: []taskv1.ResourceParam{{
+								Name:  outputImageResourceURL,
+								Value: ImageURL,
+							}},
 						},
 					},
-				},
+				}},
 			},
 		},
 	}
@@ -298,6 +293,30 @@ func GenerateTaskRun(
 			Value: v1beta1.ArrayOrString{
 				Type:      v1beta1.ParamTypeString,
 				StringVal: *build.Spec.Source.ContextDir,
+			},
+		})
+	}
+	// Collate build and buildrun params, taking buildrun params as
+	// overrides, then sort the list for reproducibility.
+	uniquePVs := map[string]buildv1alpha1.ParamValue{}
+	for _, pv := range build.Spec.Params {
+		uniquePVs[pv.Name] = pv
+	}
+	for _, pv := range buildRun.Spec.Params {
+		uniquePVs[pv.Name] = pv
+	}
+	var pvs []buildv1alpha1.ParamValue
+	for _, v := range uniquePVs {
+		pvs = append(pvs, v)
+	}
+	sort.Slice(pvs, func(i, j int) bool { return pvs[i].Name < pvs[j].Name })
+	// Convert our ParamValue to Tekton's Param.
+	for _, pv := range pvs {
+		inputParams = append(inputParams, v1beta1.Param{
+			Name: pv.Name,
+			Value: v1beta1.ArrayOrString{
+				Type:      v1beta1.ParamTypeString,
+				StringVal: pv.Value,
 			},
 		})
 	}

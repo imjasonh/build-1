@@ -144,7 +144,7 @@ kubectl apply -f samples/buildstrategy/kaniko/buildstrategy_kaniko_cr.yaml
 
 ## ko
 
-The `ko` ClusterBuilderStrategy is using [ko](https://github.com/google/ko)'s publish command to build an image from a Golang main package.
+The `ko` ClusterBuildStrategy is using [ko](https://github.com/google/ko)'s publish command to build an image from a Golang main package.
 
 ### Installing ko Strategy
 
