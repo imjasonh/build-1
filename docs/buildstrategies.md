@@ -7,6 +7,8 @@ SPDX-License-Identifier: Apache-2.0
 # BuildStrategies
 
 - [Overview](#overview)
+  - [Build Steps](#build-steps)
+  - [Parameters](#parameters)
 - [Available ClusterBuildStrategies](#available-clusterbuildstrategies)
 - [Available BuildStrategies](#available-buildstrategies)
 - [Buildah](#buildah)
@@ -29,13 +31,85 @@ SPDX-License-Identifier: Apache-2.0
 
 ## Overview
 
-There are two types of strategies, the `ClusterBuildStrategy` (`clusterbuildstrategies.shipwright.io/v1alpha1`) and the `BuildStrategy` (`buildstrategies.shipwright.io/v1alpha1`). Both strategies define a shared group of steps, needed to fullfil the application build.
+The `BuildStrategy` resource allows you to describe and reuse a image building workflows.
 
-A `ClusterBuildStrategy` is available cluster-wide, while a `BuildStrategy` is available within a namespace.
+Builds reference BuildStrategies to describe the strategy to execute on the Build's source to produce the output image.
+
+In addition to the `BuildStrategy` resource, Shipwright also provides a cluster-scoped `ClusterBuildStrategy` resource that can be defined once and reused across namespaces in the cluster.
+
+### Build Steps
+
+BuildStrategies define a set of build steps, that execute in order in a workspace with the Build's source checked out.
+
+```yaml
+apiVersion: shipwright.io/v1alpha1
+kind: BuildStrategy
+metadata:
+  name: my-strategy
+spec:
+  # Steps run in order.
+  buildSteps:
+  - ...
+  - ...
+  - ...
+```
+
+For more information about how to define cluster resource requests (e.g., CPU, memory), [see below](#steps-resource-definition).
+
+### Parameters
+
+BuildStrategies can optionally define parameters that can vary how the build steps execute, for example by passing flags or arguments to the steps' tools.
+
+When a BuildStrategy defines parameters, it can also define a default value.
+
+```yaml
+apiVersion: shipwright.io/v1alpha1
+kind: BuildStrategy
+metadata:
+  name: my-strategy
+spec:
+  buildSteps: ...
+  params:
+  - name: a-param
+    description: An example parameter.
+    defaule: The default parameter value.
+```
+
+Builds that reference the strategy can define parameter values matching the strategy's parameters, and which override the strategy's default values.
+
+```yaml
+apiVersion: shipwright.io/v1alpha1
+kind: Build
+metadata:
+  name: my-build
+spec:
+  source: ...
+  strategy:
+    name: my-strategy
+  output: ...
+  params:
+  - name: a-param
+    value: A parameter value provided by the Build.
+```
+
+Furthermore, BuildRuns can specify parameter values that override their Build and BuildStrategy's parameter values.
+
+```yaml
+apiVersion: shipwright.io/v1alpha1
+kind: BuildRun
+metadata:
+  name: my-buildrun
+spec:
+  buildRef:
+    name: my-build
+  params:
+  - name: a-param
+    value: A parameter value provided by the BuildRun.
+```
 
 ## Available ClusterBuildStrategies
 
-Well-known strategies can be boostrapped from [here](../samples/buildstrategy). The current supported Cluster BuildStrategy are:
+Well-known strategies can be boostrapped from [here](../samples/buildstrategy). The current supported ClusterBuildStrategies are:
 
 - [buildah](../samples/buildstrategy/buildah/buildstrategy_buildah_cr.yaml)
 - [buildpacks-v3-heroku](../samples/buildstrategy/buildpacks-v3/buildstrategy_buildpacks-v3-heroku_cr.yaml)
