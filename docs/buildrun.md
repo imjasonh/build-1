@@ -10,6 +10,7 @@ SPDX-License-Identifier: Apache-2.0
 - [BuildRun Controller](#buildrun-controller)
 - [Configuring a BuildRun](#configuring-a-buildrun)
   - [Defining the BuildRef](#defining-the-buildref)
+  - [Defining Parameters](#defining-parameters)
   - [Defining the ServiceAccount](#defining-the-serviceaccount)
 - [BuildRun Status](#buildrun-status)
   - [Understanding the state of a BuildRun](#understanding-the-state-of-a-BuildRun)
@@ -69,6 +70,26 @@ metadata:
 spec:
   buildRef:
     name: buildpack-nodejs-build-namespaced
+```
+
+### Defining Parameters
+
+A `BuildRun` resource can specify parameter values to pass to the specified Build's strategy.
+
+If both the BuildRun and the Build specify different values for the same named parameter, the BuildRun's value overrides.
+
+```yaml
+apiVersion: shipwright.io/v1alpha1
+kind: BuildRun
+metadata:
+  name: my-buildrun
+spec:
+  # In this example, my-build is a Build that uses a strategy that specifies a parameter named "a-param"
+  buildRef:
+    name: my-build
+  params:
+  - name: a-param
+    value: My BuildRun parameter value
 ```
 
 ### Defining the ServiceAccount

@@ -12,8 +12,9 @@ SPDX-License-Identifier: Apache-2.0
 - [Configuring a Build](#configuring-a-build)
   - [Defining the Source](#defining-the-source)
   - [Defining the Strategy](#defining-the-strategy)
-  - [Defining the Builder or Dockerfile](#defining-the-builder-or-dockerfile)
   - [Defining the Output](#defining-the-output)
+  - [Defining Parameters](#defining-parameters)
+  - [Defining the Builder or Dockerfile](#defining-the-builder-or-dockerfile)
   - [Runtime-Image](#Runtime-Image)
 - [BuildRun deletion](#BuildRun-deletion)
 
@@ -168,42 +169,6 @@ spec:
     kind: ClusterBuildStrategy
 ```
 
-### Defining the Builder or Dockerfile
-
-A `Build` resource can specify an image containing the tools to build the final image. Users can do this via the `spec.builder` or the `spec.dockerfile`. For example, the user choose  the `Dockerfile` file under the source repository.
-
-```yaml
-apiVersion: shipwright.io/v1alpha1
-kind: Build
-metadata:
-  name: buildah-golang-build
-spec:
-  source:
-    url: https://github.com/shipwright-io/sample-go
-    contextDir: docker-build
-  strategy:
-    name: buildah
-    kind: ClusterBuildStrategy
-  dockerfile: Dockerfile
-```
-
-Another example, when the user chooses to use a `builder` image ( This is required for `source-to-image` buildStrategy, because for different code languages, they have different builders. ):
-
-```yaml
-apiVersion: shipwright.io/v1alpha1
-kind: Build
-metadata:
-  name: s2i-nodejs-build
-spec:
-  source:
-    url: https://github.com/sclorg/nodejs-ex
-  strategy:
-    name: source-to-image
-    kind: ClusterBuildStrategy
-  builder:
-    image: docker.io/centos/nodejs-10-centos7
-```
-
 ### Defining the Output
 
 A `Build` resource can specify the output where the image should be pushed. For external private registries it is recommended to specify a secret with the related data to access it.
@@ -246,6 +211,65 @@ spec:
     image: us.icr.io/source-to-image-build/nodejs-ex
     credentials:
       name: icr-knbuild
+```
+
+### Defining Parameters
+
+A `Build` resource can specify parameter values to pass to the specified strategy.
+
+```yaml
+apiVersion: shipwright.io/v1alpha1
+kind: Build
+metadata:
+  name: my-build
+spec:
+  source:
+    url: https://github.com/sclorg/nodejs-ex
+  strategy:
+    # In this example, my-strategy specifies a parameter named "a-param"
+    name: my-strategy
+    kind: ClusterBuildStrategy
+  output:
+    image: us.icr.io/source-to-image-build/nodejs-ex
+  params:
+  - name: a-param
+    value: My parameter value
+```
+
+### Defining the Builder or Dockerfile
+
+A `Build` resource can specify an image containing the tools to build the final image. Users can do this via the `spec.builder` or the `spec.dockerfile`. For example, the user choose  the `Dockerfile` file under the source repository.
+
+```yaml
+apiVersion: shipwright.io/v1alpha1
+kind: Build
+metadata:
+  name: buildah-golang-build
+spec:
+  source:
+    url: https://github.com/shipwright-io/sample-go
+    contextDir: docker-build
+  strategy:
+    name: buildah
+    kind: ClusterBuildStrategy
+  dockerfile: Dockerfile
+```
+
+Another example, when the user chooses to use a `builder` image ( This is required for `source-to-image` buildStrategy, because for different code languages, they have different builders. ):
+
+```yaml
+apiVersion: shipwright.io/v1alpha1
+kind: Build
+metadata:
+  name: s2i-nodejs-build
+spec:
+  source:
+    url: https://github.com/sclorg/nodejs-ex
+  strategy:
+    name: source-to-image
+    kind: ClusterBuildStrategy
+  builder:
+    image: docker.io/centos/nodejs-10-centos7
 ```
 
 ### Runtime-Image
