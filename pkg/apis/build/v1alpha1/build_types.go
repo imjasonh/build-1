@@ -103,6 +103,18 @@ type BuildSpec struct {
 	// +optional
 	// +kubebuilder:validation:Format=duration
 	Timeout *metav1.Duration `json:"timeout,omitempty"`
+
+	Sign *Sign `json:"sign,omitempty"`
+}
+
+type Sign struct {
+	// KeyPath describes the path to the encrypted private key in the
+	// source repository.
+	KeyPath string `json:"keyPath,omitempty"`
+
+	// Passphrase references the Secret object that contains the passphrase
+	// used to decrypt the private key.
+	Passphrase corev1.LocalObjectReference `json:"passphrase,omitempty"`
 }
 
 // Image refers to an container image with credentials
@@ -112,8 +124,6 @@ type Image struct {
 
 	// Credentials references a Secret that contains credentials to access
 	// the image registry.
-	//
-	// +optional
 	Credentials *corev1.LocalObjectReference `json:"credentials,omitempty"`
 }
 

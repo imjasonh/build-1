@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
 	taskv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
 	v1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 
@@ -23,7 +24,7 @@ const (
 	inputSourceResourceName = "source"
 	inputGitSourceURL       = "url"
 	inputGitSourceRevision  = "revision"
-	inputParamBuilder  = "BUILDER_IMAGE"
+	inputParamBuilder       = "BUILDER_IMAGE"
 	inputParamDockerfile    = "DOCKERFILE"
 	inputParamContextDir    = "CONTEXT_DIR"
 	outputImageResourceName = "image"
@@ -166,6 +167,25 @@ func GenerateTaskSpec(
 		if err := AmendTaskSpecWithRuntimeImage(cfg, &generatedTaskSpec, build); err != nil {
 			return nil, err
 		}
+	}
+
+	if build.Spec.Sign != nil {
+		generatedTaskSpec.Steps = append(generatedTaskSpec.Steps, v1alpha1.Step{Container: corev1.Container{
+			// TODO: make this a flag/configmap value
+			Image: "gcr.io/projectsigstore/cosign/ci/cosign:9af4751",
+			Args: []string{
+				"sign",
+				"-key", build.Spec.Sign.KeyPath,
+				// TODO: It'd be nice to know the built image by digest, to avoid potential races.
+				"$(outputs.resources.image.url)",
+			},
+			WorkingDir: "/workspace/source",
+			EnvFrom: []corev1.EnvFromSource{{
+				SecretRef: &corev1.SecretEnvSource{
+					LocalObjectReference: build.Spec.Sign.Passphrase,
+				},
+			}},
+		}})
 	}
 
 	return &generatedTaskSpec, nil
