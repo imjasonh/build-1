@@ -6,9 +6,6 @@
 
 set -euo pipefail
 
-echo "Logging into container registry $IMAGE_HOST"
-echo "$REGISTRY_PASSWORD" | ko login -u "$REGISTRY_USERNAME" --password-stdin "$IMAGE_HOST"
-
 echo "Building container image"
 
 echo "Adding io.shipwright.vcs-ref label with value: ${GITHUB_SHA}"

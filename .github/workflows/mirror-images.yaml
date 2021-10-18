@@ -11,18 +11,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Install tools
       - uses: imjasonh/setup-crane@01d26682810dcd47bfc8eb1efe791558123a9373
+
+      - name: Login to GHCR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "${GITHUB_TOKEN}" | crane login -u "${{ github.repository_owner }}" --password-stdin ghcr.io
 
       - name: Mirror images
         env:
           REPO: ghcr.io/${{ github.repository_owner }}/shipwright-samples
         run: |
-          for img in \
-            golang:1.16 \
-            maven:3-jdk-8-openj9 \
-            node:12 \
-            open-liberty:kernel-java8-openj9-ubi \
-            ; do
-
-            crane cp ${img} ${REPO}/${img}
-          done
+          crane cp golang:1.16 ghcr.io/${{ github.repository_owner }}/shipwright-samples/golang:1.16
+          crane cp maven:3-jdk-8-openj9 ghcr.io/${{ github.repository_owner }}/shipwright-samples/maven:3-jdk-8-openj9
+          crane cp openliberty/open-liberty:kernel-java8-openj9-ubi ghcr.io/${{ github.repository_owner }}/shipwright-samples/open-liberty:kernel-java8-openj9-ubi
+          crane cp node:12 ghcr.io/${{ github.repository_owner }}/shipwright-samples/node:12
