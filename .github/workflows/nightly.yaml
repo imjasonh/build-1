@@ -1,18 +1,19 @@
 name: Nightly Release
 
 on:
+  push:
+    branches: ['sign-release-images']
   workflow_dispatch:  # Manual trigger
-
-  schedule:
-  - cron: '0 5 * * *' # 5 AM UTC = Midnight EST
 
 jobs:
   nightly:
-    if: ${{ github.repository == 'shipwright-io/build' }}
+    permissions:
+      id-token: write  # To be able to get OIDC ID token to sign images.
+      contents: read
+      packages: write
+
+    # if: ${{ github.repository == 'shipwright-io/build' }} TODO remove
     runs-on: ubuntu-latest
-    env:
-      IMAGE_HOST: quay.io
-      IMAGE_NAMESPACE: shipwright
     steps:
     - uses: actions/checkout@v2
 
@@ -20,38 +21,39 @@ jobs:
       id: date
       run: echo "::set-output name=date::$(date +'%Y-%m-%d-%s')"
 
-    - name: Install crane
-      run: curl --fail --silent --location https://github.com/google/go-containerregistry/releases/download/v0.6.0/go-containerregistry_Linux_x86_64.tar.gz | tar -xzf - -C /usr/local/bin crane
-
-    - name: Install Go
-      uses: actions/setup-go@v2
+    - uses: actions/setup-go@v2
       with:
         go-version: 1.16.x
 
-    - name: Install Ko
-      uses: imjasonh/setup-ko@20b7695b536c640edfafdd378d96c760460f29d6
+    # Install tools
+    - uses: imjasonh/setup-crane@01d26682810dcd47bfc8eb1efe791558123a9373
+    - uses: imjasonh/setup-ko@20b7695b536c640edfafdd378d96c760460f29d6
+    - uses: sigstore/cosign-installer@v1.2.0
 
     - name: Generate and upload release YAMLs
       env:
-        REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
-        REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
         TAG: "nightly-${{ steps.date.outputs.date }}"
+        IMAGE_HOST: ghcr.io
+        IMAGE_NAMESPACE: ${{ github.repository_owner}}/${{ github.repository }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         make release
 
         mv release.yaml nightly-${{ steps.date.outputs.date }}.yaml
-        gh release upload nightly nightly-${{ steps.date.outputs.date }}.yaml
+        #gh release upload nightly nightly-${{ steps.date.outputs.date }}.yaml
 
         mv release-debug.yaml nightly-${{ steps.date.outputs.date }}-debug.yaml
-        gh release upload nightly nightly-${{ steps.date.outputs.date }}-debug.yaml
+        #gh release upload nightly nightly-${{ steps.date.outputs.date }}-debug.yaml
 
         mv sample-strategies.yaml nightly-${{ steps.date.outputs.date }}-sample-strategies.yaml
-        gh release upload nightly nightly-${{ steps.date.outputs.date }}-sample-strategies.yaml
-    - name: Update latest tag of supporting images
-      working-directory: ./cmd
+        #gh release upload nightly nightly-${{ steps.date.outputs.date }}-sample-strategies.yaml
+
+    - name: Sign released images
+      env:
+        COSIGN_EXPERIMENTAL: "true"
       run: |
-        for command in *
-        do
-          crane copy "${IMAGE_HOST}/${IMAGE_NAMESPACE}/${command}:nightly-${{ steps.date.outputs.date }}" "${IMAGE_HOST}/${IMAGE_NAMESPACE}/${command}:latest"
+        for f in \
+          nightly-${{ steps.date.outputs.date }}.yaml \
+          nightly-${{ steps.date.outputs.date }}-debug.yaml; do
+          grep -o "ghcr.io[^\"]*" $f | xargs cosign sign -a sha=${{ github.sha }}
         done
