@@ -9,14 +9,10 @@ on:
 jobs:
   nightly:
     if: ${{ github.repository == 'shipwright-io/build' }}
-    permissions:
-      contents: read
-      packages: write
     runs-on: ubuntu-latest
     env:
       IMAGE_HOST: ghcr.io
       IMAGE_NAMESPACE: ${{ github.repository }}
-
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-go@v2
@@ -24,8 +20,8 @@ jobs:
         go-version: 1.16.x
 
     # Install tools
-    - uses: imjasonh/setup-crane@01d26682810dcd47bfc8eb1efe791558123a9373
     - uses: imjasonh/setup-ko@20b7695b536c640edfafdd378d96c760460f29d6
+    - uses: imjasonh/setup-crane@01d26682810dcd47bfc8eb1efe791558123a9373
 
     - name: Get current date
       id: date
@@ -33,6 +29,8 @@ jobs:
 
     - name: Generate and upload release YAMLs
       env:
+        REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        REGISTRY_USERNAME: ${{ github.repository_owner }}
         TAG: "nightly-${{ steps.date.outputs.date }}"
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
@@ -46,7 +44,6 @@ jobs:
 
         mv sample-strategies.yaml nightly-${{ steps.date.outputs.date }}-sample-strategies.yaml
         gh release upload nightly nightly-${{ steps.date.outputs.date }}-sample-strategies.yaml
-
     - name: Update latest tag of supporting images
       working-directory: ./cmd
       run: |
@@ -54,4 +51,3 @@ jobs:
         do
           crane copy "${IMAGE_HOST}/${IMAGE_NAMESPACE}/${command}:nightly-${{ steps.date.outputs.date }}" "${IMAGE_HOST}/${IMAGE_NAMESPACE}/${command}:latest"
         done
-
